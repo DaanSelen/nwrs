@@ -10,7 +10,7 @@ then
     echo "Missing argument"
 else
     deluser $username
-    rm -rfd /home/$username; rm -rfd /home/web/$username
+    rm -rfd /usr/local/nwrs/$username; rm -rfd /usr/local/nwrs/web/$username
     sed -i "/DenyUsers $username/d" /etc/ssh/sshd_config
     sed -i "/$username/d" var/users
 fi

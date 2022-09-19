@@ -13,8 +13,8 @@ else
     echo -e "$password\n$password" | adduser $username
     echo $username:$password | /usr/sbin/chpasswd
     echo "DenyUsers $username" >> /etc/ssh/sshd_config
-    mkdir /home/web/$username; mkdir /home/web/$username/html
-    chown -R $username /home/web/$username/; chmod -R 700 /home/web/$username/
+    mkdir /usr/local/nwrs/web/$username; mkdir /usr/local/nwrs/web/$username/html
+    chown -R $username /usr/local/nwrs/web/$username/; chmod -R 700 /usr/local/nwrs/web/$username/
     echo $username >> var/users
 fi
 

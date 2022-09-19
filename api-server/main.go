@@ -14,7 +14,7 @@ func main() {
 }
 
 func initHttp() {
-	fmt.Println("Starting WRS API-Server")
+	fmt.Println("Starting Nerthus WRS API-Server")
 	WRS := mux.NewRouter().StrictSlash(true)
 
 	WRS.HandleFunc("/", rootEndpoint).Methods("GET")
@@ -55,7 +55,7 @@ func manipulateContainer(command string) http.HandlerFunc {
 }
 
 func resetPort(w http.ResponseWriter, _ *http.Request) {
-	output := executeBash("/home/celdserv/apps/NWRS/scripts/resetPort.sh")
+	output := executeBash("/usr/local/nwrs/scripts/resetPort.sh")
 	json.NewEncoder(w).Encode(("PortReset finished, status: " + output))
 }
 
