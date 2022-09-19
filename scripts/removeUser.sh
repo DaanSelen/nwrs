@@ -12,5 +12,5 @@ else
     deluser $username
     rm -rfd /home/$username; rm -rfd /home/web/$username
     sed -i "/DenyUsers $username/d" /etc/ssh/sshd_config
-    sed -i "/$username/d" /home/scripts/var/users
+    sed -i "/$username/d" var/users
 fi
