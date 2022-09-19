@@ -5,14 +5,14 @@ do
         u) username=${OPTARG};;
     esac
 done
-source /home/scripts/var/highestPort
-newHighest=$((Highest+1)); echo "Highest=$newHighest" > /home/scripts/var/highestPort
+source /home/scripts/var/nextport
+newNextPort=$((NextPort+1)); echo "NextPort=$newNextPort" > /home/scripts/var/nextport
 UserID=$(id -u $username)
 if [ -z "$username" ]
 then
     echo "Missing argument"
 else
-    docker run -it -d --name $username-web --user $UserID -v /home/web/$username/html:/usr/share/nginx/html -p $Highest:8080 nginxinc/nginx-unprivileged:latest
+    docker run -it -d --name $username-web --user $UserID -v /home/web/$username/html:/usr/share/nginx/html -p $NextPort:8080 nginxinc/nginx-unprivileged:latest
 fi
 echo $Highest
 
