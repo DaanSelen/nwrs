@@ -57,6 +57,7 @@ func manipulateContainer(command string) http.HandlerFunc {
 func resetPort(w http.ResponseWriter, _ *http.Request) {
 	output := executeBash("/usr/local/nwrs/scripts/resetPort.sh")
 	json.NewEncoder(w).Encode(("PortReset finished, status: " + output))
+	fmt.Println("Done")
 }
 
 func executeBash(path string) string {
