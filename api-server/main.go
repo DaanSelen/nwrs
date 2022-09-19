@@ -22,7 +22,7 @@ func initHttp() {
 	WRS.HandleFunc("/wrs/user", manipulateUser("DELETE")).Methods("DELETE")
 	WRS.HandleFunc("/wrs/container", manipulateContainer("CREATE")).Methods("POST")
 	WRS.HandleFunc("/wrs/container", manipulateContainer("DELETE")).Methods("DELETE")
-	WRS.HandleFunc("/reset/Portcounter", resetPort()).Methods("PATCH")
+	WRS.HandleFunc("/reset/portcount", resetPort).Methods("PATCH")
 
 	http.ListenAndServe((":1234"), WRS)
 }
@@ -54,12 +54,13 @@ func manipulateContainer(command string) http.HandlerFunc {
 	}
 }
 
-func resetPort() {
-	executeBash("/home/celdserv/apps/bash/resetHighest.sh")
+func resetPort(w http.ResponseWriter, _ *http.Request) {
+	output := executeBash("/home/celdserv/apps/NWRS/scripts/resetPort.sh")
+	json.NewEncoder(w).Encode(("PortReset finished, status: " + output))
 }
 
 func executeBash(path string) string {
-	out, err := exec.Command("bash", path).Output()
+	out, err := exec.Command("/bin/bash", path).Output()
 	if err != nil {
 		fmt.Println(err)
 	}
