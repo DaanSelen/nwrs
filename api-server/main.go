@@ -37,10 +37,10 @@ func manipulateUser(command string) http.HandlerFunc {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
 		if (ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0) && command == "CREATE" {
-			executeBash("/usr/local/nwrs/scripts/createUser.sh -u " + uQuery[0] + " -p " + pQuery[0])
+			executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+uQuery[0]+" -p "+pQuery[0], true)
 			json.NewEncoder(w).Encode("CREATE USER")
 		} else if ok1 || len(uQuery) > 0 && command == "REMOVE" {
-			executeBash("/usr/local/nwrs/scripts/removeUser.sh -u " + uQuery[0])
+			executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+uQuery[0], true)
 			json.NewEncoder(w).Encode("REMOVE USER")
 		} else {
 			w.WriteHeader(400)
@@ -54,10 +54,10 @@ func manipulateContainer(command string) http.HandlerFunc {
 		if ok || len(uQuery) > 0 {
 			switch command {
 			case "CREATE":
-				executeBash("/usr/local/nwrs/scripts/createContainer.sh -u " + uQuery[0])
+				executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+uQuery[0], true)
 				json.NewEncoder(w).Encode("CREATE CONTAINER")
 			case "DELETE":
-				executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u " + uQuery[0])
+				executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+uQuery[0], true)
 				json.NewEncoder(w).Encode("DELETE CONTAINER")
 			}
 		} else {
@@ -67,15 +67,24 @@ func manipulateContainer(command string) http.HandlerFunc {
 }
 
 func resetPort(w http.ResponseWriter, _ *http.Request) {
-	output := executeBash("/usr/local/nwrs/scripts/resetPort.sh")
+	output := executeBash("/usr/local/nwrs/scripts/resetPort.sh", false)
 	json.NewEncoder(w).Encode(("PortReset finished, status: " + output))
 	fmt.Println("Done")
 }
 
-func executeBash(path string) string {
-	out, err := exec.Command("/bin/bash", "-c", path).Output()
-	if err != nil {
-		fmt.Println(err)
+func executeBash(path string, special bool) string {
+	var out []byte
+	var err error
+	if special {
+		out, err = exec.Command("/bin/bash", "-c", path).Output()
+		if err != nil {
+			fmt.Println(err)
+		}
+	} else {
+		out, err = exec.Command("/bin/bash", path).Output()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 	return (string(out))
 }
