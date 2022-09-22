@@ -73,7 +73,7 @@ func resetPort(w http.ResponseWriter, _ *http.Request) {
 }
 
 func executeBash(path string) string {
-	out, err := exec.Command("/bin/bash", path).Output()
+	out, err := exec.Command("/bin/bash", "-c", path).Output()
 	if err != nil {
 		fmt.Println(err)
 	}
