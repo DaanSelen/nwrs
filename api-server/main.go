@@ -22,7 +22,7 @@ func initHttp() {
 	WRS.HandleFunc("/wrs/user", manipulateUser("DELETE")).Methods("DELETE")
 	WRS.HandleFunc("/wrs/container", manipulateContainer("CREATE")).Methods("POST")
 	WRS.HandleFunc("/wrs/container", manipulateContainer("DELETE")).Methods("DELETE")
-	WRS.HandleFunc("/reset/portcount", resetPort).Methods("PUT")
+	WRS.HandleFunc("/reset/portcount", resetPort).Methods("GET")
 
 	http.ListenAndServe((":1234"), WRS)
 }
