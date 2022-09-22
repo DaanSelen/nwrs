@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"os/exec"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os/exec"
 
 	"github.com/gorilla/mux"
 )
@@ -34,22 +34,34 @@ func rootEndpoint(w http.ResponseWriter, _ *http.Request) {
 
 func manipulateUser(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch command {
-		case "CREATE":
+		uQuery, ok1 := r.URL.Query()["user"]
+		pQuery, ok2 := r.URL.Query()["pass"]
+		if (ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0) && command == "CREATE" {
+			executeBash("/usr/local/nwrs/scripts/createUser.sh -u " + uQuery[0] + " -p " + pQuery[0])
 			json.NewEncoder(w).Encode("CREATE USER")
-		case "DELETE":
-			json.NewEncoder(w).Encode("DELETE USER")
+		} else if ok1 || len(uQuery) > 0 && command == "REMOVE" {
+			executeBash("/usr/local/nwrs/scripts/removeUser.sh -u " + uQuery[0])
+			json.NewEncoder(w).Encode("REMOVE USER")
+		} else {
+			w.WriteHeader(400)
 		}
 	}
 }
 
 func manipulateContainer(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch command {
-		case "CREATE":
-			json.NewEncoder(w).Encode("CREATE CONTAINER")
-		case "DELETE":
-			json.NewEncoder(w).Encode("DELETE CONTAINER")
+		uQuery, ok := r.URL.Query()["user"]
+		if ok || len(uQuery) > 0 {
+			switch command {
+			case "CREATE":
+				executeBash("/usr/local/nwrs/scripts/createContainer.sh -u " + uQuery[0])
+				json.NewEncoder(w).Encode("CREATE CONTAINER")
+			case "DELETE":
+				executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u " + uQuery[0])
+				json.NewEncoder(w).Encode("DELETE CONTAINER")
+			}
+		} else {
+			w.WriteHeader(400)
 		}
 	}
 }
@@ -65,5 +77,5 @@ func executeBash(path string) string {
 	if err != nil {
 		fmt.Println(err)
 	}
-	return(string(out))
+	return (string(out))
 }
