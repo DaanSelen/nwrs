@@ -15,6 +15,5 @@ else
     echo "DenyUsers $username" >> /etc/ssh/sshd_config
     mkdir /usr/local/nwrs/web/$username; mkdir /usr/local/nwrs/web/$username/html
     chown -R $username /usr/local/nwrs/web/$username/; chmod -R 700 /usr/local/nwrs/web/$username/
-    echo $username >> var/users
 fi
 
