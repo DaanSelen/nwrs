@@ -73,6 +73,8 @@ func manipulateUser(command string) http.HandlerFunc {
 					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+uQuery[0], true)
 					manipulateData("REMOVE", uQuery[0], pQuery[0])
 					json.NewEncoder(w).Encode("REMOVE USER")
+				} else {
+					w.WriteHeader(401)
 				}
 			}
 		} else {
@@ -95,6 +97,8 @@ func manipulateContainer(command string) http.HandlerFunc {
 					executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+uQuery[0], true)
 					json.NewEncoder(w).Encode("DELETE CONTAINER")
 				}
+			} else {
+				w.WriteHeader(401)
 			}
 		} else {
 			w.WriteHeader(400)
