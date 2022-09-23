@@ -133,7 +133,7 @@ func checkAuth(username, tryPasswd string) bool {
 		panic(err)
 	}
 	fmt.Println(tryPasswd == passwd)
-	if tryPasswd == passwd {
+	if tryPasswd == passwd && passwd != "" {
 		return true
 	} else {
 		return false
