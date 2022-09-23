@@ -1,4 +1,4 @@
-module WRSSERVER
+module NWRSSERVER
 
 go 1.15
 
