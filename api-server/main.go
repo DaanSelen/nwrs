@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
@@ -65,13 +66,13 @@ func manipulateUser(command string) http.HandlerFunc {
 		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
 			switch command {
 			case "CREATE":
-				executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+uQuery[0]+" -p "+pQuery[0], true)
-				manipulateData("CREATE", uQuery[0], pQuery[0])
+				executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
+				manipulateData("CREATE", strings.ToLower(uQuery[0]), pQuery[0])
 				json.NewEncoder(w).Encode("CREATE USER")
 			case "DELETE":
-				if checkAuth(uQuery[0], pQuery[0]) {
-					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+uQuery[0], true)
-					manipulateData("REMOVE", uQuery[0], pQuery[0])
+				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
+					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+strings.ToLower(uQuery[0]), true)
+					manipulateData("REMOVE", strings.ToLower(uQuery[0]), pQuery[0])
 					json.NewEncoder(w).Encode("REMOVE USER")
 				} else {
 					w.WriteHeader(401)
@@ -88,13 +89,13 @@ func manipulateContainer(command string) http.HandlerFunc {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
 		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
-			if checkAuth(uQuery[0], pQuery[0]) {
+			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
 				switch command {
 				case "CREATE":
-					executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+uQuery[0], true)
-					json.NewEncoder(w).Encode("CREATE CONTAINER")
+					executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+strings.ToLower(uQuery[0]), true)
+					json.NewEncoder(w).Encode("Creating Container.")
 				case "DELETE":
-					executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+uQuery[0], true)
+					executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+strings.ToLower(uQuery[0]), true)
 					json.NewEncoder(w).Encode("DELETE CONTAINER")
 				}
 			} else {
