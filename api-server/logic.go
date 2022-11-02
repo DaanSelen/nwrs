@@ -42,8 +42,7 @@ func manipulateUser(command string) http.HandlerFunc {
 			switch command {
 			case "CREATE":
 				executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
-
-				manipulateData("CREATE", strings.ToLower(uQuery[0]))
+				manipulateData("CREATE", strings.ToLower(uQuery[0]), pQuery[0])
 				json.NewEncoder(w).Encode("CREATE USER")
 			case "DELETE":
 				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
