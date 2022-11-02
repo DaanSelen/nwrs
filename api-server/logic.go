@@ -1,12 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -21,9 +24,7 @@ func main() {
 func initApp() {
 	fmt.Println("Starting Nerthus WRS SQLite Connection")
 	nerthusDB, _ := sql.Open("sqlite3", "./nwrs.db")
-	getMaxID(nerthusDB)
-	nerthusDB.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, username TEXT, passwd TEXT);")
-	nerthusDB.Exec("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='user';")
+	nerthusDB.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY, username TEXT, passwd TEXT);")
 
 	fmt.Println("Starting Nerthus WRS REST API-Server")
 	NWRS := mux.NewRouter().StrictSlash(true)
@@ -51,16 +52,18 @@ func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
 			switch command {
 			case "CREATE":
 				if !checkDuplicate(uQuery[0], nerthusDB) {
+					nextID := (getMaxID(nerthusDB) + 1)
+					hashedPasswd := hashWithSalt(pQuery[0], nextID)
+					manipulateData("CREATE", strings.ToLower(uQuery[0]), hashedPasswd, nerthusDB)
 					executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
-					manipulateData("CREATE", strings.ToLower(uQuery[0]), pQuery[0], nerthusDB)
 					json.NewEncoder(w).Encode("CREATE USER")
 				} else {
 					w.WriteHeader(400)
 				}
 			case "DELETE":
 				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0], nerthusDB) {
-					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+strings.ToLower(uQuery[0]), true)
 					manipulateData("REMOVE", strings.ToLower(uQuery[0]), pQuery[0], nerthusDB)
+					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+strings.ToLower(uQuery[0]), true)
 					json.NewEncoder(w).Encode("REMOVE USER")
 				} else {
 					w.WriteHeader(401)
@@ -103,9 +106,9 @@ func resetPort(w http.ResponseWriter, _ *http.Request) {
 
 func manipulateData(command, username, passwd string, db *sql.DB) {
 	if command == "CREATE" {
-		_, err := db.Exec("INSERT INTO user(username, passwd) VALUES('" + username + "', '" + passwd + "')")
+		_, err := db.Exec("INSERT INTO user(id, username, passwd) VALUES('" + strconv.Itoa(getMaxID(db)+1) + "', '" + username + "', '" + passwd + "');")
 		if err != nil {
-			panic(err)
+			log.Println(err)
 		}
 	} else if command == "REMOVE" {
 		_, err := db.Exec("DELETE FROM user WHERE username = '" + username + "'")
@@ -117,12 +120,10 @@ func manipulateData(command, username, passwd string, db *sql.DB) {
 
 func checkAuth(username, tryPasswd string, db *sql.DB) bool {
 	var passwd string
-	err := db.QueryRow("SELECT passwd FROM user WHERE username = '" + username + "'").Scan(&passwd)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(tryPasswd == passwd)
-	if tryPasswd == passwd && passwd != "" {
+	var trialID int
+	db.QueryRow("SELECT id, passwd FROM user WHERE username = '"+username+"'").Scan(&trialID, &passwd)
+	hashedTryPasswd := hashWithSalt(tryPasswd, trialID)
+	if hashedTryPasswd == passwd && passwd != "" {
 		return true
 	} else {
 		return false
@@ -149,7 +150,6 @@ func executeBash(path string, special bool) string {
 func checkDuplicate(user string, db *sql.DB) bool {
 	var duplicateAmount int
 	db.QueryRow("SELECT COUNT(*) FROM user WHERE EXISTS (SELECT username FROM user WHERE username == '" + user + "');").Scan(&duplicateAmount)
-	log.Println(duplicateAmount)
 	if duplicateAmount == 0 {
 		return false
 	} else {
@@ -162,9 +162,15 @@ func getMaxID(db *sql.DB) int {
 	err := db.QueryRow("SELECT MAX(id) FROM user;").Scan(&maxID)
 	switch err {
 	case nil:
-		fmt.Println(maxID)
+		return maxID
 	default:
-		maxID = 0
+		return 0
 	}
-	return maxID
+}
+
+func hashWithSalt(passwd string, id int) string {
+	log.Println(id)
+	hash := sha256.New()
+	hash.Write([]byte((passwd + strconv.Itoa(id))))
+	return base64.URLEncoding.EncodeToString(hash.Sum(nil))
 }
