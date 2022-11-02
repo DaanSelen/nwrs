@@ -1,32 +1,41 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os/exec"
 	"strings"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-	initDB()
-	initHttp()
+	initApp()
 }
 
-func initHttp() {
-	fmt.Println("Starting Nerthus WRS API-Server")
-	WRS := mux.NewRouter().StrictSlash(true)
+func initApp() {
+	fmt.Println("Starting Nerthus WRS SQLite Connection")
+	nerthusDB, _ := sql.Open("sqlite3", "./nwrs.db")
+	getMaxID(nerthusDB)
+	nerthusDB.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, username TEXT, passwd TEXT);")
+	nerthusDB.Exec("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='user';")
 
-	WRS.HandleFunc("/", rootEndpoint).Methods("GET")
-	WRS.HandleFunc("/wrs/user", manipulateUser("CREATE")).Methods("POST")
-	WRS.HandleFunc("/wrs/user", manipulateUser("DELETE")).Methods("DELETE")
-	WRS.HandleFunc("/wrs/container", manipulateContainer("CREATE")).Methods("POST")
-	WRS.HandleFunc("/wrs/container", manipulateContainer("DELETE")).Methods("DELETE")
-	WRS.HandleFunc("/wrs/portcount", resetPort).Methods("PATCH")
+	fmt.Println("Starting Nerthus WRS REST API-Server")
+	NWRS := mux.NewRouter().StrictSlash(true)
 
-	http.ListenAndServe((":1234"), WRS)
+	NWRS.HandleFunc("/", rootEndpoint).Methods("GET")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE", nerthusDB)).Methods("POST")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE", nerthusDB)).Methods("DELETE")
+	NWRS.HandleFunc("/nwrs/container", manipulateContainer("CREATE", nerthusDB)).Methods("POST")
+	NWRS.HandleFunc("/nwrs/container", manipulateContainer("DELETE", nerthusDB)).Methods("DELETE")
+	NWRS.HandleFunc("/nwrs/portcount", resetPort).Methods("PATCH")
+
+	http.ListenAndServe((":1234"), NWRS)
 }
 
 func rootEndpoint(w http.ResponseWriter, _ *http.Request) {
@@ -34,20 +43,24 @@ func rootEndpoint(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode("Root endpoint hit.")
 }
 
-func manipulateUser(command string) http.HandlerFunc {
+func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
 		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
 			switch command {
 			case "CREATE":
-				executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
-				manipulateData("CREATE", strings.ToLower(uQuery[0]), pQuery[0])
-				json.NewEncoder(w).Encode("CREATE USER")
+				if !checkDuplicate(uQuery[0], nerthusDB) {
+					executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
+					manipulateData("CREATE", strings.ToLower(uQuery[0]), pQuery[0], nerthusDB)
+					json.NewEncoder(w).Encode("CREATE USER")
+				} else {
+					w.WriteHeader(400)
+				}
 			case "DELETE":
-				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
+				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0], nerthusDB) {
 					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+strings.ToLower(uQuery[0]), true)
-					manipulateData("REMOVE", strings.ToLower(uQuery[0]), pQuery[0])
+					manipulateData("REMOVE", strings.ToLower(uQuery[0]), pQuery[0], nerthusDB)
 					json.NewEncoder(w).Encode("REMOVE USER")
 				} else {
 					w.WriteHeader(401)
@@ -59,12 +72,12 @@ func manipulateUser(command string) http.HandlerFunc {
 	}
 }
 
-func manipulateContainer(command string) http.HandlerFunc {
+func manipulateContainer(command string, nerthusDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
 		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
-			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
+			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0], nerthusDB) {
 				switch command {
 				case "CREATE":
 					executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+strings.ToLower(uQuery[0]), true)
@@ -88,7 +101,7 @@ func resetPort(w http.ResponseWriter, _ *http.Request) {
 	fmt.Println("Done")
 }
 
-func manipulateData(command, username, passwd string) {
+func manipulateData(command, username, passwd string, db *sql.DB) {
 	if command == "CREATE" {
 		_, err := db.Exec("INSERT INTO user(username, passwd) VALUES('" + username + "', '" + passwd + "')")
 		if err != nil {
@@ -102,7 +115,7 @@ func manipulateData(command, username, passwd string) {
 	}
 }
 
-func checkAuth(username, tryPasswd string) bool {
+func checkAuth(username, tryPasswd string, db *sql.DB) bool {
 	var passwd string
 	err := db.QueryRow("SELECT passwd FROM user WHERE username = '" + username + "'").Scan(&passwd)
 	if err != nil {
@@ -131,4 +144,27 @@ func executeBash(path string, special bool) string {
 		}
 	}
 	return (string(out))
+}
+
+func checkDuplicate(user string, db *sql.DB) bool {
+	var duplicateAmount int
+	db.QueryRow("SELECT COUNT(*) FROM user WHERE EXISTS (SELECT username FROM user WHERE username == '" + user + "');").Scan(&duplicateAmount)
+	log.Println(duplicateAmount)
+	if duplicateAmount == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+func getMaxID(db *sql.DB) int {
+	var maxID int
+	err := db.QueryRow("SELECT MAX(id) FROM user;").Scan(&maxID)
+	switch err {
+	case nil:
+		fmt.Println(maxID)
+	default:
+		maxID = 0
+	}
+	return maxID
 }
