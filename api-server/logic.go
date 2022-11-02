@@ -1,14 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -58,21 +55,24 @@ func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
 					hashedPasswd := hashWithSalt(pQuery[0], nextID)
 					manipulateData("CREATE", strings.ToLower(uQuery[0]), hashedPasswd)
 					executeBash("/usr/local/nwrs/scripts/createUser.sh -u "+strings.ToLower(uQuery[0])+" -p "+pQuery[0], true)
-					json.NewEncoder(w).Encode("CREATE USER")
+					json.NewEncoder(w).Encode("CREATING USER: " + uQuery[0] + " FINISHED")
 				} else {
 					w.WriteHeader(400)
+					json.NewEncoder(w).Encode("ERROR: Duplicate Detected (User already exists).")
 				}
 			case "DELETE":
 				if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
 					manipulateData("REMOVE", strings.ToLower(uQuery[0]), pQuery[0])
 					executeBash("/usr/local/nwrs/scripts/removeUser.sh -u "+strings.ToLower(uQuery[0]), true)
-					json.NewEncoder(w).Encode("REMOVE USER")
+					json.NewEncoder(w).Encode("REMOVING USER: " + uQuery[0] + " FINISHED")
 				} else {
 					w.WriteHeader(401)
+					json.NewEncoder(w).Encode("ERROR: Incorrect credentials or user does not exist.")
 				}
 			}
 		} else {
 			w.WriteHeader(400)
+			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument.")
 		}
 	}
 }
@@ -86,24 +86,20 @@ func manipulateContainer(command string) http.HandlerFunc {
 				switch command {
 				case "CREATE":
 					executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+strings.ToLower(uQuery[0]), true)
-					json.NewEncoder(w).Encode("Creating Container.")
+					json.NewEncoder(w).Encode("CREATING Container.")
 				case "DELETE":
 					executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+strings.ToLower(uQuery[0]), true)
 					json.NewEncoder(w).Encode("DELETE CONTAINER")
 				}
 			} else {
 				w.WriteHeader(401)
+				json.NewEncoder(w).Encode("ERROR: Duplicate Detected (User already exists).")
 			}
 		} else {
 			w.WriteHeader(400)
+			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument.")
 		}
 	}
-}
-
-func resetPort(w http.ResponseWriter, _ *http.Request) {
-	output := executeBash("/usr/local/nwrs/scripts/resetPort.sh", false)
-	json.NewEncoder(w).Encode(("PortReset finished, status: " + output))
-	fmt.Println("Done")
 }
 
 func manipulateData(command, username, passwd string) {
@@ -118,61 +114,4 @@ func manipulateData(command, username, passwd string) {
 			panic(err)
 		}
 	}
-}
-
-func checkAuth(username, tryPasswd string) bool {
-	var passwd string
-	var trialID int
-	nerthusDB.QueryRow("SELECT id, passwd FROM user WHERE username = '"+username+"'").Scan(&trialID, &passwd)
-	hashedTryPasswd := hashWithSalt(tryPasswd, trialID)
-	if hashedTryPasswd == passwd && len(passwd) != 0 {
-		return true
-	} else {
-		return false
-	}
-}
-
-func executeBash(path string, special bool) string {
-	var out []byte
-	var err error
-	if special {
-		out, err = exec.Command("/bin/bash", "-c", path).Output()
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		out, err = exec.Command("/bin/bash", path).Output()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
-	return (string(out))
-}
-
-func checkDuplicate(user string) bool {
-	var duplicateAmount int
-	nerthusDB.QueryRow("SELECT COUNT(*) FROM user WHERE EXISTS (SELECT username FROM user WHERE username == '" + user + "');").Scan(&duplicateAmount)
-	if duplicateAmount == 0 {
-		return false
-	} else {
-		return true
-	}
-}
-
-func getMaxID() int {
-	var maxID int
-	err := nerthusDB.QueryRow("SELECT MAX(id) FROM user;").Scan(&maxID)
-	switch err {
-	case nil:
-		return maxID
-	default:
-		return 0
-	}
-}
-
-func hashWithSalt(passwd string, id int) string {
-	log.Println(id)
-	hash := sha256.New()
-	hash.Write([]byte((passwd + strconv.Itoa(id))))
-	return base64.URLEncoding.EncodeToString(hash.Sum(nil))
 }
