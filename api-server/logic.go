@@ -44,7 +44,7 @@ func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
 		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
 			switch command {
 			case "CREATE":
-				if !checkDuplicate(uQuery[0]) {
+				if !checkDupl(uQuery[0]) {
 					nextID := (getMaxID() + 1)
 					hashedPasswd := hashWithSalt(pQuery[0], nextID)
 					manipulateData("CREATE", strings.ToLower(uQuery[0]), hashedPasswd)
@@ -75,20 +75,15 @@ func manipulateContainer(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
-		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 {
-			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
-				switch command {
-				case "CREATE":
-					executeBash("/usr/local/nwrs/scripts/createCont.sh -u "+strings.ToLower(uQuery[0])+" -port "+strconv.Itoa(getPort("NEXT")), true)
-					manageContainer("CREATE", uQuery[0])
-					json.NewEncoder(w).Encode("CREATING Container.")
-				case "DELETE":
-					executeBash("/usr/local/nwrs/scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
-					json.NewEncoder(w).Encode("DELETE CONTAINER")
-				}
-			} else {
-				w.WriteHeader(401)
-				json.NewEncoder(w).Encode("ERROR: Duplicate Detected (User already exists).")
+		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 && checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
+			switch command {
+			case "CREATE":
+				executeBash("/usr/local/nwrs/scripts/createCont.sh -u "+strings.ToLower(uQuery[0])+" -port "+strconv.Itoa(getPort("NEXT")), true)
+				manageContainer("CREATE", uQuery[0])
+				json.NewEncoder(w).Encode("CREATING Container.")
+			case "DELETE":
+				executeBash("/usr/local/nwrs/scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
+				json.NewEncoder(w).Encode("DELETE CONTAINER")
 			}
 		} else {
 			w.WriteHeader(400)
@@ -99,17 +94,10 @@ func manipulateContainer(command string) http.HandlerFunc {
 
 func executeBash(path string, special bool) string {
 	var out []byte
-	var err error
 	if special {
-		out, err = exec.Command("/bin/bash", "-c", path).Output()
-		if err != nil {
-			log.Fatal(err)
-		}
+		out, _ = exec.Command("/bin/bash", "-c", path).Output()
 	} else {
-		out, err = exec.Command("/bin/bash", path).Output()
-		if err != nil {
-			log.Fatal(err)
-		}
+		out, _ = exec.Command("/bin/bash", path).Output()
 	}
 	return (string(out))
 }

@@ -85,7 +85,7 @@ func checkAuth(username, tryPasswd string) bool {
 	}
 }
 
-func checkDuplicate(user string) bool {
+func checkDupl(user string) bool {
 	var duplicateAmount int
 	db.QueryRow("SELECT COUNT(*) FROM user WHERE EXISTS (SELECT username FROM user WHERE username == '" + user + "');").Scan(&duplicateAmount)
 	if duplicateAmount == 0 {
@@ -107,7 +107,6 @@ func getMaxID() int {
 }
 
 func hashWithSalt(passwd string, id int) string {
-	log.Println(id)
 	hash := sha256.New()
 	hash.Write([]byte((passwd + strconv.Itoa(id))))
 	return base64.URLEncoding.EncodeToString(hash.Sum(nil))
