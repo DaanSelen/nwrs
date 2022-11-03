@@ -28,12 +28,12 @@ func manipulateData(command, username, passwd string) {
 	if command == "CREATE" {
 		_, err := db.Exec("INSERT INTO user(id, username, passwd) VALUES('" + strconv.Itoa(getMaxID()+1) + "', '" + username + "', '" + passwd + "');")
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	} else if command == "REMOVE" {
 		_, err := db.Exec("DELETE FROM user WHERE username = '" + username + "'")
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 	}
 }

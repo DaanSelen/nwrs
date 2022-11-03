@@ -83,6 +83,7 @@ func manipulateContainer(command string) http.HandlerFunc {
 				json.NewEncoder(w).Encode("CREATING Container.")
 			case "DELETE":
 				executeBash("/usr/local/nwrs/scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
+				manageContainer("CREATE", uQuery[0])
 				json.NewEncoder(w).Encode("DELETE CONTAINER")
 			}
 		} else {
