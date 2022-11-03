@@ -3,37 +3,31 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
-	_ "github.com/mattn/go-sqlite3"
 )
 
-var nerthusDB *sql.DB
-
 func main() {
-	initApp()
+	initDB()
+	initHTTP()
 }
 
-func initApp() {
-	fmt.Println("Starting Nerthus WRS SQLite Connection")
-	nerthusDB, _ = sql.Open("sqlite3", "./nwrs.db")
-	nerthusDB.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY, username TEXT, passwd TEXT);")
-
-	fmt.Println("Starting Nerthus WRS REST API-Server")
+func initHTTP() {
+	log.Println("Starting Nerthus WRS REST API-Server")
 	NWRS := mux.NewRouter().StrictSlash(true)
 
 	NWRS.HandleFunc("/", rootEndpoint).Methods("GET")
-	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE", nerthusDB)).Methods("POST")
-	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE", nerthusDB)).Methods("DELETE")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE", db)).Methods("POST")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE", db)).Methods("DELETE")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("CREATE")).Methods("POST")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("DELETE")).Methods("DELETE")
-	NWRS.HandleFunc("/nwrs/portcount", resetPort).Methods("PATCH")
+	NWRS.HandleFunc("/nwrs/management/port", manipulatePort("GETPORT")).Methods("GET")
+	NWRS.HandleFunc("/nwrs/management/port", manipulatePort("RESETPORT")).Methods("PATCH")
 
 	http.ListenAndServe((":1234"), NWRS)
 }
@@ -85,10 +79,11 @@ func manipulateContainer(command string) http.HandlerFunc {
 			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
 				switch command {
 				case "CREATE":
-					executeBash("/usr/local/nwrs/scripts/createContainer.sh -u "+strings.ToLower(uQuery[0]), true)
+					executeBash("/usr/local/nwrs/scripts/createCont.sh -u "+strings.ToLower(uQuery[0])+" -port "+strconv.Itoa(getPort("NEXT")), true)
+					manageContainer("CREATE", uQuery[0])
 					json.NewEncoder(w).Encode("CREATING Container.")
 				case "DELETE":
-					executeBash("/usr/local/nwrs/scripts/removeContainer.sh -u "+strings.ToLower(uQuery[0]), true)
+					executeBash("/usr/local/nwrs/scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
 					json.NewEncoder(w).Encode("DELETE CONTAINER")
 				}
 			} else {
@@ -102,16 +97,31 @@ func manipulateContainer(command string) http.HandlerFunc {
 	}
 }
 
-func manipulateData(command, username, passwd string) {
-	if command == "CREATE" {
-		_, err := nerthusDB.Exec("INSERT INTO user(id, username, passwd) VALUES('" + strconv.Itoa(getMaxID()+1) + "', '" + username + "', '" + passwd + "');")
+func executeBash(path string, special bool) string {
+	var out []byte
+	var err error
+	if special {
+		out, err = exec.Command("/bin/bash", "-c", path).Output()
 		if err != nil {
-			log.Println(err)
+			log.Fatal(err)
 		}
-	} else if command == "REMOVE" {
-		_, err := nerthusDB.Exec("DELETE FROM user WHERE username = '" + username + "'")
+	} else {
+		out, err = exec.Command("/bin/bash", path).Output()
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
+		}
+	}
+	return (string(out))
+}
+
+func manipulatePort(command string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch command {
+		case "GETPORT":
+			json.NewEncoder(w).Encode(getPort("CURRENT"))
+		case "RESETPORT":
+			setPort("RESET", 0)
+			json.NewEncoder(w).Encode(getPort("CURRENT"))
 		}
 	}
 }
