@@ -22,6 +22,7 @@ func initDB() {
 	db.Exec("CREATE TABLE IF NOT EXISTS port(id INTEGER NOT NULL PRIMARY KEY, number INTEGER);")
 
 	db.Exec("INSERT INTO port VALUES('0', '10001')")
+	log.Println("SQLITE Connection Succesful.")
 }
 
 func manipulateData(command, username, passwd string) {
