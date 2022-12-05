@@ -1,2 +1,5 @@
 # NWRS
-Nerthus Webserver Request Server
+Nerthus 
+Webserver 
+Request 
+Server
