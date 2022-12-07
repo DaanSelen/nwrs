@@ -18,7 +18,7 @@ func initDB() {
 	db, _ = sql.Open("sqlite3", "./nwrs.db")
 
 	db.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY, username TEXT, passwd TEXT);")
-	db.Exec("CREATE TABLE IF NOT EXISTS cont(id INTEGER NOT NULL PRIMARY KEY, container TEXT, owner TEXT);")
+	db.Exec("CREATE TABLE IF NOT EXISTS cont(id INTEGER NOT NULL PRIMARY KEY, container TEXT, owner TEXT, seq INTEGER);")
 	db.Exec("CREATE TABLE IF NOT EXISTS port(id INTEGER NOT NULL PRIMARY KEY, number INTEGER);")
 
 	db.Exec("INSERT INTO port VALUES('0', '10001')")
@@ -27,7 +27,7 @@ func initDB() {
 
 func manipulateData(command, username, passwd string) {
 	if command == "CREATE" {
-		_, err := db.Exec("INSERT INTO user(id, username, passwd) VALUES('" + strconv.Itoa(getMaxID()+1) + "', '" + username + "', '" + passwd + "');")
+		_, err := db.Exec("INSERT INTO user(id, username, passwd) VALUES(null, '" + username + "', '" + passwd + "');")
 		if err != nil {
 			log.Println(err)
 		}
@@ -42,12 +42,17 @@ func manipulateData(command, username, passwd string) {
 func manageContainer(command, username string) {
 	switch command {
 	case "CREATE":
-
+		checkContainer(username)
 	case "DELETE":
-
-	case "CHECK":
-
+		checkContainer(username)
 	}
+}
+
+func checkContainer(username string) int {
+	var sequence int
+	db.QueryRow("SELECT seq FROM cont WHERE owner == '" + username + "'").Scan(&sequence)
+	log.Println(sequence)
+	return 0
 }
 
 func getPort(command string) int {
@@ -58,7 +63,7 @@ func getPort(command string) int {
 		return number
 	case "NEXT":
 		db.QueryRow("SELECT number FROM port;").Scan(&number)
-		db.Exec("UPDATE port SET number = " + strconv.Itoa(number+1) + " WHERE id = 0;")
+		setPort("SETNEW", (number + 1))
 		return number + 1
 	default:
 		return 0

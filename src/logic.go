@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -22,8 +21,8 @@ func initHTTP() {
 	NWRS := mux.NewRouter().StrictSlash(true)
 
 	NWRS.HandleFunc("/", rootEndpoint).Methods("GET")
-	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE", db)).Methods("POST")
-	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE", db)).Methods("DELETE")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE")).Methods("POST")
+	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE")).Methods("DELETE")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("CREATE")).Methods("POST")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("DELETE")).Methods("DELETE")
 	NWRS.HandleFunc("/nwrs/management/port", manipulatePort("GETPORT")).Methods("GET")
@@ -37,7 +36,7 @@ func rootEndpoint(w http.ResponseWriter, _ *http.Request) {
 	json.NewEncoder(w).Encode("Root endpoint hit. Version 0.2")
 }
 
-func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
+func manipulateUser(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
@@ -61,13 +60,13 @@ func manipulateUser(command string, nerthusDB *sql.DB) http.HandlerFunc {
 					json.NewEncoder(w).Encode("REMOVING USER: " + uQuery[0] + " FINISHED")
 				} else {
 					w.WriteHeader(401)
-					json.NewEncoder(w).Encode("ERROR: Incorrect credentials or user does not exist.")
+					json.NewEncoder(w).Encode("ERROR: Authentication failure, or non-existing user.")
 					log.Println("Invalid or incorrect user DELETE request.")
 				}
 			}
 		} else {
 			w.WriteHeader(400)
-			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument.")
+			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument(s).")
 		}
 	}
 }
@@ -76,20 +75,26 @@ func manipulateContainer(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uQuery, ok1 := r.URL.Query()["user"]
 		pQuery, ok2 := r.URL.Query()["pass"]
-		if ok1 || len(uQuery) > 0 && ok2 || len(pQuery) > 0 && checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
-			switch command {
-			case "CREATE":
-				executeBash("./scripts/createCont.sh -u "+strings.ToLower(uQuery[0])+" -port "+strconv.Itoa(getPort("NEXT")), true)
-				manageContainer("CREATE", uQuery[0])
-				json.NewEncoder(w).Encode("CREATING Container.")
-			case "DELETE":
-				executeBash("./scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
-				manageContainer("CREATE", uQuery[0])
-				json.NewEncoder(w).Encode("DELETE CONTAINER")
+		iQuery, ok3 := r.URL.Query()["id"]
+		if (ok1 || len(uQuery) > 0) && (ok2 || len(pQuery) > 0) && (ok3 || len(iQuery) > 0) {
+			if checkAuth(strings.ToLower(uQuery[0]), pQuery[0]) {
+				switch command {
+				case "CREATE":
+					executeBash("./scripts/createCont.sh -u "+strings.ToLower(uQuery[0])+" -port "+strconv.Itoa(getPort("NEXT")), true)
+					manageContainer("CREATE", uQuery[0])
+					json.NewEncoder(w).Encode("CREATING Container.")
+				case "DELETE":
+					executeBash("./scripts/removeCont.sh -u "+strings.ToLower(uQuery[0]), true)
+					manageContainer("CREATE", uQuery[0])
+					json.NewEncoder(w).Encode("DELETE CONTAINER")
+				}
+			} else {
+				w.WriteHeader(401)
+				json.NewEncoder(w).Encode("ERROR: Authentication failure.")
 			}
 		} else {
 			w.WriteHeader(400)
-			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument.")
+			json.NewEncoder(w).Encode("ERROR: Missing one (or more) required query argument(s).")
 		}
 	}
 }
