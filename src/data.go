@@ -44,7 +44,8 @@ func manageContainer(command, username string, optnumber int) {
 	switch command {
 	case "CREATE":
 		sequence := checkContainer(username)
-		db.Exec("INSERT INTO cont VALUES(null, '" + username + "-webserver', '" + username + "', '" + strconv.Itoa(sequence) + "', '" + strconv.Itoa(optnumber) + "')")
+		db.Exec("INSERT INTO cont VALUES(null, '" + username + "', '" + strconv.Itoa(sequence) + "', '" + strconv.Itoa(optnumber) + "')")
+		log.Println("INSERT INTO cont VALUES(null, '" + username + "', '" + strconv.Itoa(sequence) + "', '" + strconv.Itoa(optnumber) + "')")
 	case "DELETE":
 		db.Exec("DELETE FROM cont WHERE owner =='" + username + "' AND seq == " + strconv.Itoa(optnumber))
 	}
@@ -69,6 +70,14 @@ func listContainers(username string) []ListedContainer {
 		listedContainers = append(listedContainers, singleContainer)
 	}
 	return listedContainers
+}
+
+func generateContainername(username string) string {
+	var sequence int
+	var owner string
+	db.QueryRow("SELECT owner FROM cont WHERE owner == '" + username + "'").Scan(&owner)
+	db.QueryRow("SELECT MAX(seq) FROM cont WHERE owner == '" + username + "'").Scan(&sequence)
+	return (owner + "-web-" + strconv.Itoa(sequence))
 }
 
 func getPort(command string) int {

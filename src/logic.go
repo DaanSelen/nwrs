@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -96,13 +97,15 @@ func manipulateContainer(command string) http.HandlerFunc {
 				switch command {
 				case "CREATE":
 					port := getPort("NEXT")
-					//executeBash("./scripts/createCont.sh -u "+strings.ToLower(form.Username)+" -port "+strconv.Itoa(port), true)
 					manageContainer("CREATE", form.Username, port)
+					containername := generateContainername(form.Username)
+					executeBash("./scripts/createCont.sh  -u "+strings.ToLower(form.Username)+" -cn "+containername+" -port "+strconv.Itoa(port), true)
+					log.Println("./scripts/createCont.sh  -u " + strings.ToLower(form.Username) + " -cn " + containername + " -port " + strconv.Itoa(port))
 					json.NewEncoder(w).Encode("CREATING Container.")
 				case "DELETE":
 					if form.Seq > 0 {
-						//executeBash("./scripts/removeCont.sh -u "+strings.ToLower(form.Username), true)
 						manageContainer("DELETE", form.Username, form.Seq)
+						executeBash("./scripts/removeCont.sh -u "+strings.ToLower(form.Username), true)
 						json.NewEncoder(w).Encode("DELETE CONTAINER")
 					}
 				case "CHECK":
@@ -122,10 +125,13 @@ func manipulateContainer(command string) http.HandlerFunc {
 
 func executeBash(path string, special bool) string {
 	var out []byte
+	var err error
 	if special {
-		out, _ = exec.Command("/bin/bash", "-c", path).Output()
+		out, err = exec.Command("/bin/bash", "-c", path).Output()
+		log.Println(string(out), err)
 	} else {
-		out, _ = exec.Command("/bin/bash", path).Output()
+		out, err = exec.Command("/bin/bash", path).Output()
+		log.Println(string(out), err)
 	}
 	return (string(out))
 }
