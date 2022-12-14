@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -16,9 +15,15 @@ type UserRequestForm struct {
 	Password string `json:"password"`
 }
 type ContRequestForm struct {
-	ID       int    `json:"id"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Seq      int    `json:"seq"`
+}
+type ListedContainer struct {
+	ID    int    `json:"id"`
+	Owner string `json:"owner"`
+	Seq   int    `json:"seq"`
+	Port  int    `json:"port"`
 }
 
 func main() {
@@ -33,6 +38,7 @@ func initHTTP() {
 	NWRS.HandleFunc("/", rootEndpoint).Methods("GET")
 	NWRS.HandleFunc("/nwrs/user", manipulateUser("CREATE")).Methods("POST")
 	NWRS.HandleFunc("/nwrs/user", manipulateUser("DELETE")).Methods("DELETE")
+	NWRS.HandleFunc("/nwrs/container", manipulateContainer("CHECK")).Methods("GET")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("CREATE")).Methods("POST")
 	NWRS.HandleFunc("/nwrs/container", manipulateContainer("DELETE")).Methods("DELETE")
 	NWRS.HandleFunc("/nwrs/management/port", manipulatePort("GETPORT")).Methods("GET")
@@ -85,17 +91,23 @@ func manipulateContainer(command string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var form ContRequestForm
 		json.NewDecoder(r.Body).Decode(&form)
-		if len(form.Username) > 0 && len(form.Password) > 0 && form.ID > 0 {
+		if len(form.Username) > 0 && len(form.Password) > 0 {
 			if checkAuth(strings.ToLower(form.Username), form.Password) {
 				switch command {
 				case "CREATE":
-					executeBash("./scripts/createCont.sh -u "+strings.ToLower(form.Username)+" -port "+strconv.Itoa(getPort("NEXT")), true)
-					manageContainer("CREATE", form.Username)
+					port := getPort("NEXT")
+					//executeBash("./scripts/createCont.sh -u "+strings.ToLower(form.Username)+" -port "+strconv.Itoa(port), true)
+					manageContainer("CREATE", form.Username, port)
 					json.NewEncoder(w).Encode("CREATING Container.")
 				case "DELETE":
-					executeBash("./scripts/removeCont.sh -u "+strings.ToLower(form.Username), true)
-					manageContainer("CREATE", form.Username)
-					json.NewEncoder(w).Encode("DELETE CONTAINER")
+					if form.Seq > 0 {
+						//executeBash("./scripts/removeCont.sh -u "+strings.ToLower(form.Username), true)
+						manageContainer("DELETE", form.Username, form.Seq)
+						json.NewEncoder(w).Encode("DELETE CONTAINER")
+					}
+				case "CHECK":
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(listContainers(form.Username))
 				}
 			} else {
 				w.WriteHeader(401)

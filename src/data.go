@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"strconv"
 
@@ -18,10 +19,10 @@ func initDB() {
 	db, _ = sql.Open("sqlite3", "./nwrs.db")
 
 	db.Exec("CREATE TABLE IF NOT EXISTS user(id INTEGER NOT NULL PRIMARY KEY, username TEXT, passwd TEXT);")
-	db.Exec("CREATE TABLE IF NOT EXISTS cont(id INTEGER NOT NULL PRIMARY KEY, container TEXT, owner TEXT, seq INTEGER);")
+	db.Exec("CREATE TABLE IF NOT EXISTS cont(id INTEGER NOT NULL PRIMARY KEY, owner TEXT, seq INTEGER, port INTEGER);")
 	db.Exec("CREATE TABLE IF NOT EXISTS port(id INTEGER NOT NULL PRIMARY KEY, number INTEGER);")
 
-	db.Exec("INSERT INTO port VALUES('0', '10001')")
+	db.Exec("INSERT INTO port VALUES('0', '10000')")
 	log.Println("SQLITE Connection Succesful.")
 }
 
@@ -39,20 +40,35 @@ func manipulateData(command, username, passwd string) {
 	}
 }
 
-func manageContainer(command, username string) {
+func manageContainer(command, username string, optnumber int) {
 	switch command {
 	case "CREATE":
-		checkContainer(username)
+		sequence := checkContainer(username)
+		db.Exec("INSERT INTO cont VALUES(null, '" + username + "-webserver', '" + username + "', '" + strconv.Itoa(sequence) + "', '" + strconv.Itoa(optnumber) + "')")
 	case "DELETE":
-		checkContainer(username)
+		db.Exec("DELETE FROM cont WHERE owner =='" + username + "' AND seq == " + strconv.Itoa(optnumber))
 	}
 }
 
 func checkContainer(username string) int {
 	var sequence int
-	db.QueryRow("SELECT seq FROM cont WHERE owner == '" + username + "'").Scan(&sequence)
-	log.Println(sequence)
-	return 0
+	db.QueryRow("SELECT MAX(seq) FROM cont WHERE owner == '" + username + "'").Scan(&sequence)
+	return sequence + 1
+}
+
+func listContainers(username string) []ListedContainer {
+	var listedContainers []ListedContainer
+	data, err := db.Query("SELECT * FROM cont WHERE owner == '" + username + "'")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer data.Close()
+	for data.Next() {
+		var singleContainer ListedContainer
+		data.Scan(&singleContainer.ID, &singleContainer.Owner, &singleContainer.Seq, &singleContainer.Port)
+		listedContainers = append(listedContainers, singleContainer)
+	}
+	return listedContainers
 }
 
 func getPort(command string) int {
